@@ -6,7 +6,4 @@
   <Folder Name="/tests/">
     <Project Path="tests/KorobokNet.Core.Tests/KorobokNet.Core.Tests.csproj" />
   </Folder>
-  <Folder Name="/tools/">
-    <Project Path="tools/AssetImport/AssetImport.csproj" />
-  </Folder>
 </Solution>
