@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KorobokNet.Core/KorobokNet.Core.csproj" />
+    <Project Path="src/KorobokNet/KorobokNet.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KorobokNet.Core.Tests/KorobokNet.Core.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/AssetImport/AssetImport.csproj" />
+  </Folder>
+</Solution>

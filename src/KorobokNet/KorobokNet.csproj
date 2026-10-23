@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>KorobokNet</RootNamespace>
+    <AssemblyName>KorobokNet</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Icon.ico</ApplicationIcon>
+    <!-- MonoGame пока собран под .NET 8; разрешаем запуск на более новом рантайме. -->
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" />
+    <PackageReference Include="FontStashSharp.MonoGame" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KorobokNet.Core\KorobokNet.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Icon.bmp" LogicalName="Icon.bmp" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,106 @@
+{
+  "legend": "k - робот, c - ящик, s - грядка, t - мусор, ? - неизвестная клетка (половина из них радиация), 0 - пусто. Строки в том же виде, что в оригинальном ObjectPosition.cs. solution — эталонная программа на 3 звезды (проверяется тестами, используется для демонстрации);   синтаксис описан в Programs/RobotProgram.cs. tutorial — поле для живых демонстраций в обучающем сюжете.",
+    "tutorial": {
+      "heading": "west",
+      "rows": [ "000000", "0s0000", "0c0000", "0k0000", "000000", "000000" ],
+      "solution": "L F"
+    },
+    "levels": [
+    {
+      "heading": "north",
+      "rows": [ "tt0ttt", "tt0ttt", "t0000t", "t0kcst", "t0000t", "tttttt" ],
+      "solution": "L F",
+      "stars": { "three": { "maxActions": 2 }, "two": { "maxActions": 3 } }
+    },
+    {
+      "heading": "north",
+      "rows": [ "t0000t", "t0k00t", "t00t0t", "t00cst", "t0tt0t", "t0000t" ],
+      "solution": "F F L F",
+      "stars": { "three": { "maxActions": 4 }, "two": { "maxActions": 5 } }
+    },
+    {
+      "heading": "south",
+      "rows": [ "ttt0tt", "0000tt", "0sc0tt", "0tt00t", "00000t", "0kt00t" ],
+      "solution": "F L B B L B B R F",
+      "stars": { "three": { "maxActions": 9 }, "two": { "maxActions": 11 } }
+    },
+    {
+      "heading": "east",
+      "rows": [ "ttttt0", "t000tt", "00s000", "sc0ck0", "t000tt", "ttttt0" ],
+      "solution": "F L F L B L F L F",
+      "stars": { "three": { "maxActions": 9 }, "two": { "maxActions": 11 } }
+    },
+    {
+      "heading": "west",
+      "rows": [ "tttttt", "0?0000", "k?0cs0", "t00000", "ttt000", "ttttt0" ],
+      "solution": "?(L F R F F L B R F|F F F)",
+      "stars": {
+        "three": { "minActions": 9, "maxActions": 12, "minIfs": 1, "maxIfs": 2 },
+        "two": { "minActions": 13, "maxActions": 14, "minIfs": 1 }
+      }
+    },
+    {
+      "heading": "west",
+      "rows": [ "tttttt", "t0000t", "t0t00?", "t0ts0t", "t0tctt", "tk?stt" ],
+      "solution": "?(L F F F F L B B L F F F|F F L F)",
+      "stars": {
+        "three": { "minActions": 9, "maxActions": 16, "minIfs": 1, "maxIfs": 2 },
+        "two": { "minActions": 17, "maxActions": 18, "minIfs": 1 }
+      }
+    },
+    {
+      "heading": "west",
+      "rows": [ "tttttt", "t00000", "t0tst0", "t0?cs0", "t0t?t0", "tk0000" ],
+      "solution": "F F L ?(R B B L F F R F F|F F)",
+      "stars": {
+        "three": { "minActions": 7, "maxActions": 14, "minIfs": 1, "maxIfs": 2 },
+        "two": { "minActions": 12, "maxActions": 13, "minIfs": 1 }
+      }
+    },
+    {
+      "heading": "west",
+      "rows": [ "tttttt", "t0s0s0", "tsc0cs", "tt?t?t", "k00000", "0t0t0t" ],
+      "solution": "F F L ?(R F F L F F L F F|F F R F F)",
+      "stars": {
+        "three": { "minActions": 9, "maxActions": 17, "minIfs": 1, "maxIfs": 2 },
+        "two": { "minActions": 18, "maxActions": 19, "minIfs": 1 }
+      }
+    },
+    {
+      "heading": "west",
+      "rows": [ "tttttt", "0k000t", "tstt0t", "tctt0t", "t0000t", "tttttt" ],
+      "solution": "4(F F F R)",
+      "stars": {
+        "three": { "maxActions": 6, "minLoops": 1, "maxLoops": 2 },
+        "two": { "maxActions": 8, "minLoops": 1 }
+      }
+    },
+    {
+      "heading": "east",
+      "rows": [ "ttt000", "0tttt0", "0000t0", "00t0t0", "0kt000", "ttt0cs" ],
+      "solution": "L 3(B B R B) F",
+      "stars": {
+        "three": { "maxActions": 6, "minLoops": 1, "maxLoops": 2 },
+        "two": { "maxActions": 8, "minLoops": 1 }
+      }
+    },
+    {
+      "heading": "west",
+      "rows": [ "tttttt", "ttt0cs", "tt00tt", "t00ttt", "00tttt", "kttttt" ],
+      "solution": "5(F L F R)",
+      "stars": {
+        "three": { "maxActions": 4, "minLoops": 1, "maxLoops": 2 },
+        "two": { "maxActions": 6, "minLoops": 1 }
+      }
+    },
+    {
+      "heading": "north",
+      "rows": [ "tttttt", "tttt00", "tts000", "ttckcs", "tt0000", "t00000" ],
+      "solution": "4(F R F)",
+      "stars": {
+        "three": { "maxActions": 4, "minLoops": 1, "maxLoops": 2 },
+        "two": { "maxActions": 6, "minLoops": 1 }
+      }
+    }
+  ]
+}

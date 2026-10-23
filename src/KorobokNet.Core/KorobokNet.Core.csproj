@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>KorobokNet.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Levels\levels.json" LogicalName="KorobokNet.Core.Levels.levels.json" />
+  </ItemGroup>
+
+</Project>
