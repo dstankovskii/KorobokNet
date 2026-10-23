@@ -16,7 +16,7 @@ public sealed class GameSessionTests : IDisposable
     }
 
     private GameSession NewSession() =>
-        new(new SaveStore(Path.Combine(_dir, "save.json")), new ResultLog(Path.Combine(_dir, "results")), LevelLoader.LoadCatalog());
+        new(new SaveStore(Path.Combine(_dir, "save.json")), LevelLoader.LoadCatalog());
 
     [Theory]
     [InlineData("", NameCheck.Empty)]
@@ -37,18 +37,43 @@ public sealed class GameSessionTests : IDisposable
     }
 
     [Fact]
-    public void WinKeepsBestStarsAndWritesLog()
+    public void MusicAndSoundAreSwitchedSeparately()
+    {
+        NewSession().MusicOff = true;
+
+        var session = NewSession();
+
+        Assert.True(session.MusicOff);
+        Assert.False(session.SoundOff);
+    }
+
+    [Fact]
+    public void WinKeepsBestStars()
     {
         var session = NewSession();
         session.CreateUser("Петя");
         var level = session.Levels[0];
 
-        Assert.Equal(1, session.RecordWin(level, RobotProgram.Parse("L R R R F"), DateTime.Now));
-        Assert.Equal(3, session.RecordWin(level, RobotProgram.Parse("L F"), DateTime.Now));
-        Assert.Equal(1, session.RecordWin(level, RobotProgram.Parse("L R R R F"), DateTime.Now));
+        Assert.Equal(1, session.RecordWin(level, RobotProgram.Parse("L R R R F")));
+        Assert.Equal(3, session.RecordWin(level, RobotProgram.Parse("L F")));
+        Assert.Equal(1, session.RecordWin(level, RobotProgram.Parse("L R R R F")));
 
         Assert.Equal(3, NewSession().Stars(1));
-        Assert.Equal(3, File.ReadAllLines(Path.Combine(_dir, "results", "Петя.txt")).Length);
+    }
+
+    [Fact]
+    public void LevelOpensAfterPreviousIsPassed()
+    {
+        var session = NewSession();
+        session.CreateUser("Даша");
+
+        Assert.True(session.IsUnlocked(1));
+        Assert.False(session.IsUnlocked(2));
+
+        session.RecordWin(session.Levels[0], RobotProgram.Parse("L R R R F"));
+
+        Assert.True(session.IsUnlocked(2));
+        Assert.False(session.IsUnlocked(3));
     }
 
     [Fact]
@@ -67,17 +92,16 @@ public sealed class GameSessionTests : IDisposable
     }
 
     [Fact]
-    public void DeleteUserRemovesProgressAndLog()
+    public void DeleteUserRemovesProgress()
     {
         var session = NewSession();
         session.CreateUser("Вася");
-        session.RecordWin(session.Levels[0], RobotProgram.Parse("L F"), DateTime.Now);
+        session.RecordWin(session.Levels[0], RobotProgram.Parse("L F"));
 
         session.DeleteUser("вася");
 
         Assert.Null(session.User);
         Assert.Empty(NewSession().Data.Users);
-        Assert.False(File.Exists(Path.Combine(_dir, "results", "Вася.txt")));
     }
 
     [Fact]

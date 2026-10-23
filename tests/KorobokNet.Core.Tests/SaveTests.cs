@@ -66,23 +66,4 @@ public sealed class SaveTests : IDisposable
         user.GetLevel(12).Stars = 2;
         Assert.True(user.HasCompletedAll(12));
     }
-
-    [Fact]
-    public void ResultLogLineMatchesOriginalWording() =>
-        Assert.Equal(
-            "Уровень: 5 | действий: 12 | циклов: 0 | условий: 1 | баллы: 3 | время: 22.10.2026 09:05",
-            ResultLog.FormatLine(5, new ProgramStats(12, 1, 0), 3, new DateTime(2026, 10, 22, 9, 5, 0)));
-
-    [Fact]
-    public void ResultLogAppendsPerUserFile()
-    {
-        var log = new ResultLog(_dir);
-
-        log.Append("Вася/Пупкин", 1, new ProgramStats(2, 0, 0), 3, DateTime.Now);
-        log.Append("Вася/Пупкин", 2, new ProgramStats(4, 0, 0), 3, DateTime.Now);
-
-        var path = log.FilePathFor("Вася/Пупкин");
-        Assert.StartsWith(_dir, path);
-        Assert.Equal(2, File.ReadAllLines(path).Length);
-    }
 }

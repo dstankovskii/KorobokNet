@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework;
 namespace KorobokNet.Ui;
 
 /// <summary>
-/// Кнопка: картинка из атласа (<see cref="Sprite"/>) или табличка с текстом.
+/// Кнопка: картинка из атласа (<see cref="Sprite"/>), рисунок кодом (<see cref="Painter"/>) или табличка с текстом.
 /// Срабатывает при отпускании над кнопкой - так удобно и мышью, и пальцем.
 /// </summary>
 public sealed class Button
@@ -34,6 +34,10 @@ public sealed class Button
 
     public RectangleF Bounds { get; set; }
     public string? Sprite { get; set; }
+
+    /// <summary>Рисует кнопку в заданном прямоугольнике с заданной тонировкой (наведение, неактивна).</summary>
+    public Action<Gfx, RectangleF, Color>? Painter { get; set; }
+
     public string? Text { get; set; }
     public float TextSize { get; set; } = 44;
     public Action? OnClick { get; set; }
@@ -87,13 +91,20 @@ public sealed class Button
         var bounds = _pressed && _hover ? Bounds.Scale(0.93f) : Bounds;
         var tint = !Enabled ? Color.White * 0.45f : _hover ? new Color(255, 255, 235) : Color.White;
 
-        if (Sprite is not null)
+        if (Sprite is not null || Painter is not null)
         {
             if (Selected)
             {
                 g.RoundRect(bounds.Inflate(8), 18, new Color(255, 230, 90) * 0.9f);
             }
-            g.SpriteFit(Sprite, bounds, tint);
+            if (Painter is not null)
+            {
+                Painter(g, bounds, tint);
+            }
+            else
+            {
+                g.SpriteFit(Sprite!, bounds, tint);
+            }
             if (Text is not null)
             {
                 g.TextBlock(Text, bounds, TextSize, TextColor * (Enabled ? 1f : 0.5f), bold: true);

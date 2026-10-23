@@ -1,6 +1,7 @@
 using System.Collections;
 using KorobokNet.Core;
 using KorobokNet.Engine;
+using KorobokNet.Ui;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -17,6 +18,7 @@ public sealed class BoardView
     private const float CubeScale = 0.75f;
     private const float Pause = 0.4f;
     private const float MoveSeconds = 0.6f;
+    private const float CheckSeconds = 1.1f;
 
     // Мусор и деревья в оригинале чуть повёрнуты (-2.6° в Unity).
     private const float DecorRotation = 0.0454f;
@@ -28,8 +30,11 @@ public sealed class BoardView
     private readonly Dictionary<GridPos, Actor> _cubes = [];
     private readonly Dictionary<GridPos, float> _questAlpha = [];
     private readonly Dictionary<GridPos, float> _radiationAlpha = [];
-    private readonly List<(string Sprite, Vector2 World, float Scale, float Depth)> _decorations = [];
+    private readonly List<(Vector2 World, float Depth)> _decorations = [];
     private Motion _motion = Motion.None;
+
+    // Ответ на последнюю проверку условия, пока над роботом висит табличка.
+    private bool? _check;
 
     // Board меняет направление сразу при исполнении команды, а робот на экране поворачивается позже,
     // поэтому анимации берут направление отсюда.
@@ -52,14 +57,7 @@ public sealed class BoardView
         }
         foreach (var d in DecorationGenerator.Generate(decorationSeed))
         {
-            var world = Iso.Cell(Iso.TrashOrigin, d.Cell);
-            var depth = CellDepth(d.Cell);
-            _decorations.Add(d.Kind switch
-            {
-                DecorationKind.Trash => ("trash_plane", world + new Vector2(0.32f, 0.17f), 0.72f, depth),
-                DecorationKind.Tree1 => ("tree_0", world + new Vector2(0.32f, 0.17f), 1.3f, depth),
-                _ => ("tree_1", world + new Vector2(0.32f, 0f), 1f, depth),
-            });
+            _decorations.Add((Iso.Cell(Iso.TrashOrigin, d.Cell) + new Vector2(0.32f, 0.17f), CellDepth(d.Cell)));
         }
     }
 
@@ -140,11 +138,9 @@ public sealed class BoardView
             var world = Iso.Cell(Iso.TrashOrigin, cell);
             items.Add((CellDepth(cell), () => DrawRotated(g, trash, world, new Vector2(0.72f, 0.6f))));
         }
-        foreach (var (sprite, world, scale, depth) in _decorations)
+        foreach (var (world, depth) in _decorations)
         {
-            var def = _assets.Sprite(sprite);
-            var size = sprite == "trash_plane" ? new Vector2(0.72f, 0.6f) : new Vector2(scale);
-            items.Add((depth, () => DrawRotated(g, def, world, size)));
+            items.Add((depth, () => DrawRotated(g, trash, world, new Vector2(0.72f, 0.6f))));
         }
         foreach (var cube in _cubes.Values)
         {
@@ -156,6 +152,31 @@ public sealed class BoardView
         {
             draw();
         }
+
+        if (_check is { } radiation)
+        {
+            DrawCheck(g, radiation);
+        }
+    }
+
+    /// <summary>Табличка над роботом: что он увидел впереди и какую ветку выбрал.</summary>
+    private void DrawCheck(Gfx g, bool radiation)
+    {
+        var sprite = _assets.Animation(_robot.Clip).FrameAt(_robot.Time);
+        var scale = Iso.Scale(sprite, RobotScale);
+        var corner = Iso.ToScreen(_robot.World) - sprite.Origin * scale;
+        var tip = new Vector2(corner.X + sprite.Source.Width * scale / 2, corner.Y + sprite.Source.Height * scale * 0.15f);
+
+        var panel = RectangleF.FromCenter(new Vector2(tip.X, tip.Y - 36 - 65), 420, 130);
+        panel = panel.Offset(new Vector2(Math.Clamp(panel.X, 20, Gfx.Width - 20 - panel.Width) - panel.X, Math.Max(0, 20 - panel.Y)));
+        var root = new Vector2(tip.X, panel.Bottom - 8);
+        g.Triangle(root, tip, 48, Callout.Border);
+        g.Panel(panel, Callout.Fill, Callout.Border, 24, 4);
+        g.Triangle(root - new Vector2(0, 2), tip - new Vector2(0, 8), 34, Callout.Fill);
+
+        g.Text("Радиация впереди?", new Vector2(panel.Center.X, panel.Y + 12), 34, Callout.Ink, Align.Center, bold: true);
+        g.Text(radiation ? "Да" : "Нет", new Vector2(panel.Center.X, panel.Y + 56), 48,
+            radiation ? new Color(34, 140, 50) : new Color(200, 50, 40), Align.Center, bold: true);
     }
 
     private IEnumerator Animate(GameEvent e)
@@ -179,6 +200,12 @@ public sealed class BoardView
                 break;
             case QuestRevealedEvent reveal:
                 yield return Reveal(reveal);
+                break;
+            case ConditionCheckedEvent check:
+                _audio.SetMotor(false);
+                _check = check.IsRadiation;
+                yield return CheckSeconds;
+                _check = null;
                 break;
             case LevelWonEvent:
                 yield return StopMotion();

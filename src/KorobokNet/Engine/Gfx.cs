@@ -40,6 +40,17 @@ public sealed class Gfx(SpriteBatch batch, GameAssets assets)
         Batch.Draw(sprite.Texture, pos, sprite.Source, color ?? Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
     }
 
+    /// <summary>Текстура по центру области с сохранением пропорций, поворот вокруг центра.</summary>
+    public void Texture(Texture2D texture, RectangleF area, Color color, float rotation = 0f)
+    {
+        var scale = Math.Min(area.Width / texture.Width, area.Height / texture.Height);
+        Batch.Draw(texture, area.Center, null, color, rotation, new Vector2(texture.Width, texture.Height) / 2, scale, SpriteEffects.None, 0f);
+    }
+
+    /// <summary>Покомпонентное умножение цвета, как тонировка спрайта.</summary>
+    public static Color Tint(Color color, Color tint) =>
+        new(color.R * tint.R / 255, color.G * tint.G / 255, color.B * tint.B / 255, color.A * tint.A / 255);
+
     public void SpriteFill(string name, RectangleF area, Color? color = null)
     {
         var sprite = Assets.Sprite(name);
@@ -66,6 +77,16 @@ public sealed class Gfx(SpriteBatch batch, GameAssets assets)
 
     public void Rect(RectangleF r, Color color) => Batch.Draw(Assets.Pixel, r.ToRectangle(), color);
 
+    /// <summary>Вертикальный градиент от <paramref name="top"/> к <paramref name="bottom"/>, по строке пикселей.</summary>
+    public void Gradient(RectangleF r, Color top, Color bottom)
+    {
+        var rows = Math.Max(1, (int)MathF.Round(r.Height));
+        for (var i = 0; i < rows; i++)
+        {
+            Rect(new RectangleF(r.X, r.Y + i, r.Width, 1), Color.Lerp(top, bottom, (i + 0.5f) / rows));
+        }
+    }
+
     public void RectOutline(RectangleF r, Color color, float thickness = 2f)
     {
         Rect(new RectangleF(r.X, r.Y, r.Width, thickness), color);
@@ -76,7 +97,10 @@ public sealed class Gfx(SpriteBatch batch, GameAssets assets)
 
     public void RoundRect(RectangleF r, float radius, Color color)
     {
-        radius = Math.Min(radius, Math.Min(r.Width, r.Height) / 2);
+        // Округляем заранее, иначе части по-разному округлятся при выводе и между ними будут щели.
+        var snapped = r.ToRectangle();
+        r = new RectangleF(snapped.X, snapped.Y, snapped.Width, snapped.Height);
+        radius = MathF.Round(Math.Min(radius, Math.Min(r.Width, r.Height) / 2));
         var d = radius * 2;
         var circle = Assets.Circle;
         var half = circle.Width / 2;
@@ -97,8 +121,18 @@ public sealed class Gfx(SpriteBatch batch, GameAssets assets)
         RoundRect(r.Inflate(-borderWidth), radius - borderWidth, fill);
     }
 
-    public void Circle(Vector2 center, float radius, Color color) =>
-        Batch.Draw(Assets.Circle, new RectangleF(center.X - radius, center.Y - radius, radius * 2, radius * 2).ToRectangle(), color);
+    public void Circle(Vector2 center, float radius, Color color)
+    {
+        // Круг рисуется под свой размер: растянутая маленькая текстура даёт мыльный край.
+        var size = Math.Max(2, (int)MathF.Ceiling(radius * 2));
+        var disc = Assets.Painted($"disc@{size}", () =>
+        {
+            var canvas = new Canvas(size);
+            canvas.Fill(Shapes.Circle(new Vector2(50, 50), 50), Color.White);
+            return canvas;
+        });
+        Batch.Draw(disc, center, null, color, 0f, new Vector2(size / 2f), radius * 2 / size, SpriteEffects.None, 0f);
+    }
 
     public void Line(Vector2 a, Vector2 b, float thickness, Color color)
     {
@@ -111,7 +145,36 @@ public sealed class Gfx(SpriteBatch batch, GameAssets assets)
         Batch.Draw(Assets.Pixel, a, null, color, MathF.Atan2(delta.Y, delta.X), new Vector2(0, 0.5f), new Vector2(length, thickness), SpriteEffects.None, 0f);
     }
 
+    /// <summary>Равнобедренный треугольник от середины основания <paramref name="from"/> до вершины <paramref name="tip"/>.</summary>
+    public void Triangle(Vector2 from, Vector2 tip, float baseWidth, Color color)
+    {
+        var delta = tip - from;
+        var length = delta.Length();
+        if (length < 0.01f)
+        {
+            return;
+        }
+        const int size = 128;
+        var texture = Assets.Painted("triangle", () =>
+        {
+            var canvas = new Canvas(size);
+            canvas.Fill(Shapes.Polygon(new(0, 0), new(100, 50), new(0, 100)), Color.White);
+            return canvas;
+        });
+        Batch.Draw(texture, from, null, color, MathF.Atan2(delta.Y, delta.X), new Vector2(0, size / 2f),
+            new Vector2(length / size, baseWidth / size), SpriteEffects.None, 0f);
+    }
+
     public Vector2 MeasureText(string text, float size, bool bold = false) => Assets.Font(size, bold).MeasureString(text);
+
+    /// <summary>Размер текста, который <see cref="TextBlock"/> перенесёт по ширине <paramref name="width"/>.</summary>
+    public Vector2 MeasureBlock(string text, float size, float width, bool bold = false)
+    {
+        var font = Assets.Font(size, bold);
+        var lines = Wrap(font, text, width);
+        var widest = lines.Max(line => font.MeasureString(line).X);
+        return new Vector2(widest, size * 1.2f * lines.Count);
+    }
 
     /// <summary>Однострочный текст; <paramref name="position"/> - точка выравнивания по горизонтали и верх строки.</summary>
     public void Text(string text, Vector2 position, float size, Color color, Align align = Align.Left, bool bold = false)

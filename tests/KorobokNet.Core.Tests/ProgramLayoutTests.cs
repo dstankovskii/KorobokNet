@@ -43,17 +43,19 @@ public class ProgramLayoutTests
     }
 
     [Fact]
-    public void IfPutsNoBranchOnNextRow()
+    public void IfForksIntoYesAndNoRows()
     {
         var (_, layout) = Build("?(F F|L) B");
 
         Assert.Equal(
-            "Start@0,0 IfStart@1,0 Forward@2,0 Forward@3,0 IfEnd@4,0 Back@5,0 IfElse@1,1 TurnLeft@2,1",
+            "Start@0,0 IfStart@1,0 IfThen@2,0 Forward@3,0 Forward@4,0 IfEnd@5,0 Back@6,0 IfElse@2,1 TurnLeft@3,1",
             Describe(layout));
         Assert.Equal(2, layout.Rows);
+        Assert.Contains(new LayoutLink(1, 0, 2, 0), layout.Links);
         Assert.Contains(new LayoutLink(1, 0, 1, 1), layout.Links);
-        Assert.Contains(new LayoutLink(2, 1, 4, 1), layout.Links);
-        Assert.Contains(new LayoutLink(4, 1, 4, 0), layout.Links);
+        Assert.Contains(new LayoutLink(1, 1, 2, 1), layout.Links);
+        Assert.Contains(new LayoutLink(3, 1, 5, 1), layout.Links);
+        Assert.Contains(new LayoutLink(5, 1, 5, 0), layout.Links);
     }
 
     [Fact]
@@ -61,7 +63,15 @@ public class ProgramLayoutTests
     {
         var (_, layout) = Build("?(|)");
 
-        Assert.Equal("Start@0,0 IfStart@1,0 IfEnd@2,0 IfElse@1,1", Describe(layout));
+        Assert.Equal("Start@0,0 IfStart@1,0 IfThen@2,0 IfEnd@3,0 IfElse@2,1", Describe(layout));
+    }
+
+    [Fact]
+    public void ConditionBlockHasNoCursorSlot()
+    {
+        var (_, layout) = Build("?(F|L)");
+
+        Assert.Null(Assert.Single(layout.Blocks, b => b.Kind == BlockKind.IfStart).Slot);
     }
 
     [Fact]
@@ -71,10 +81,10 @@ public class ProgramLayoutTests
 
         var slots = editor.AllSlots();
 
-        Assert.Equal(slots.Count, layout.Blocks.Count);
+        Assert.Equal(slots.Count, layout.Blocks.Count(b => b.Slot is not null));
         foreach (var slot in slots)
         {
-            Assert.Single(layout.Blocks, b => b.Slot.Equals(slot));
+            Assert.Single(layout.Blocks, b => b.Holds(slot));
         }
     }
 

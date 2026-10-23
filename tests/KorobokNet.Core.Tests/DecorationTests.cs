@@ -17,13 +17,18 @@ public class DecorationTests
     }
 
     [Fact]
-    public void TrashOnlyInLowerHalfTreesInUpper()
+    public void StonesStayOutOfSkyAndTabletButton()
     {
-        var all = Enumerable.Range(0, 50).SelectMany(DecorationGenerator.Generate).ToList();
+        for (var seed = 0; seed < 50; seed++)
+        {
+            var stones = DecorationGenerator.Generate(seed);
 
-        Assert.All(all.Where(d => d.Kind == DecorationKind.Trash), d => Assert.True(d.Cell.X - d.Cell.Y <= 0));
-        Assert.All(all.Where(d => d.Kind != DecorationKind.Trash), d => Assert.True(d.Cell.X - d.Cell.Y > 0));
-        Assert.Contains(all, d => d.Kind == DecorationKind.Tree1);
-        Assert.Contains(all, d => d.Kind == DecorationKind.Tree2);
+            Assert.InRange(stones.Count, 6, DecorationGenerator.MaxCount);
+            Assert.All(stones, d => Assert.True(DecorationGenerator.Allowed(d.Cell.X, d.Cell.Y), d.ToString()));
+            Assert.All(stones, a => Assert.Single(stones, b => DecorationGenerator.Touches(a.Cell, b.Cell)));
+        }
+        Assert.False(DecorationGenerator.Allowed(10, 0));
+        Assert.False(DecorationGenerator.Allowed(9, 4));
+        Assert.False(DecorationGenerator.Allowed(4, 10));
     }
 }

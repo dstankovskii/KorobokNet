@@ -1,4 +1,5 @@
 using KorobokNet.Engine;
+using KorobokNet.Ui;
 using Microsoft.Xna.Framework;
 
 namespace KorobokNet.Screens;
@@ -32,6 +33,10 @@ public abstract class Screen(KorobokGame game)
         var strip = new Rectangle(sprite.Source.X + 800, sprite.Source.Y, 20, sprite.Source.Height);
         g.Batch.Draw(sprite.Texture, new Rectangle(0, 0, Gfx.Width, Gfx.Height), strip, Color.White);
     }
+
+    /// <summary>Круглая кнопка "назад" в левом верхнем углу.</summary>
+    protected static Button BackButton(Action onClick) =>
+        new(new RectangleF(40, 30, 112, 112), onClick: onClick) { Painter = Icons.RoundButton(Icons.BlueButton, "arrow_left") };
 
     protected static void DrawTitle(Gfx g, string text, float y = 50) =>
         g.Text(text, new Vector2(Gfx.Width / 2f, y), 80, Color.White, Align.Center);

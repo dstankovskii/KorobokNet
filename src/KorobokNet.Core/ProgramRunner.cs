@@ -37,25 +37,23 @@ public sealed class ProgramRunner
             return [];
         }
 
-        var command = NextCommand();
+        var events = new List<GameEvent>();
+        var command = NextCommand(events);
         if (command is null)
         {
             IsFinished = true;
-            return [];
+            return events;
         }
 
         StepsTaken++;
-        var events = new List<GameEvent>
+        events.Add(command.Value switch
         {
-            command.Value switch
-            {
-                Command.Forward => _board.Forward(),
-                Command.Back => _board.Back(),
-                Command.TurnLeft => _board.TurnLeft(),
-                Command.TurnRight => _board.TurnRight(),
-                _ => throw new NotSupportedException(command.Value.ToString()),
-            },
-        };
+            Command.Forward => _board.Forward(),
+            Command.Back => _board.Back(),
+            Command.TurnLeft => _board.TurnLeft(),
+            Command.TurnRight => _board.TurnRight(),
+            _ => throw new NotSupportedException(command.Value.ToString()),
+        });
 
         if (_board.IsWon)
         {
@@ -82,7 +80,8 @@ public sealed class ProgramRunner
         return all;
     }
 
-    private Command? NextCommand()
+    /// <summary>Следующая команда. Проверки условий по дороге попадают в <paramref name="checks"/>.</summary>
+    private Command? NextCommand(List<GameEvent> checks)
     {
         while (_stack.Count > 0)
         {
@@ -107,7 +106,9 @@ public sealed class ProgramRunner
                 case CommandInstruction c:
                     return c.Command;
                 case IfRadiationInstruction i:
-                    _stack.Push(new Frame(_board.IsRadiationAhead ? i.Then : i.Else, 1));
+                    var radiation = _board.IsRadiationAhead;
+                    checks.Add(new ConditionCheckedEvent(_board.Ahead, radiation));
+                    _stack.Push(new Frame(radiation ? i.Then : i.Else, 1));
                     break;
                 case RepeatInstruction r:
                     _stack.Push(new Frame(r.Body, r.Count));

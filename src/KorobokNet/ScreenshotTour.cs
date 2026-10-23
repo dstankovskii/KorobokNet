@@ -28,7 +28,12 @@ internal sealed class ScreenshotTour
             ("story-intro", () => new StoryScreen(game, StoryScreen.Intro), 1.5f),
             ("story-ride", () => new StoryScreen(game, StoryScreen.Intro, 2), 6f),
             ("story-program", () => new StoryScreen(game, StoryScreen.Intro, 11), 1.5f),
+            ("story-delete", () => new StoryScreen(game, StoryScreen.Intro, 9), 2.2f),
             ("story-last", () => new StoryScreen(game, StoryScreen.Intro, StoryScreen.Intro.Count - 1), 1f),
+            .. StoryScreen.Intro
+                .Select((step, i) => (step, i))
+                .Where(x => x.step.Target is not null)
+                .Select(x => ($"story-{x.i + 1:00}-{x.step.Target}", (Func<Screen>)(() => new StoryScreen(game, StoryScreen.Intro, x.i)), 0.6f)),
             ("levels", () => new LevelSelectScreen(game), 1.5f),
             ("tutorial", () => new LevelScreen(game, tutorial), 1.5f),
             ("level-01", () => new LevelScreen(game, level1), 1.5f),
@@ -39,11 +44,32 @@ internal sealed class ScreenshotTour
                 screen.PreviewResult(2);
                 return screen;
             }, 1f),
+            ("level-empty-program", () =>
+            {
+                var screen = new LevelScreen(game, level1, Core.Programs.RobotProgram.Empty);
+                screen.Toggle();
+                return screen;
+            }, 1f),
+            ("level-05-check", () =>
+            {
+                var screen = new LevelScreen(game, session.Levels[4], session.Levels[4].Solution);
+                screen.Toggle();
+                return screen;
+            }, 1.1f),
             ("level-09", () => new LevelScreen(game, level9), 1.5f),
             ("program-empty", () => new ProgramScreen(game, level1), 1.5f),
             ("program-05", () => new ProgramScreen(game, session.Levels[4], initial: session.Levels[4].Solution), 1.5f),
+            ("program-06", () => new ProgramScreen(game, session.Levels[5], initial: session.Levels[5].Solution), 1.5f),
+            ("program-08", () => new ProgramScreen(game, session.Levels[7], initial: session.Levels[7].Solution), 1.5f),
+            ("program-if-empty", () => new ProgramScreen(game, session.Levels[5], initial: Core.Programs.RobotProgram.Parse("F ?(|) L 2(F ?(R|))")), 1.5f),
             ("program-10", () => new ProgramScreen(game, session.Levels[9], initial: session.Levels[9].Solution), 1.5f),
             ("story-finale", () => new StoryScreen(game, StoryScreen.Finale), 1.5f),
+            ("settings", () =>
+            {
+                var screen = new StartScreen(game);
+                screen.OpenSettings();
+                return screen;
+            }, 1f),
         ];
     }
 

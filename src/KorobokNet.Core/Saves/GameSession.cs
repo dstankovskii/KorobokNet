@@ -3,7 +3,7 @@ using KorobokNet.Core.Programs;
 namespace KorobokNet.Core.Saves;
 
 /// <summary>
-/// Прогресс игроков: выбор игрока, программы и звёзды по уровням, журнал для учителя.
+/// Прогресс игроков: выбор игрока, программы и звёзды по уровням.
 /// Каждое изменение сразу записывается на диск.
 /// </summary>
 public sealed class GameSession
@@ -11,12 +11,10 @@ public sealed class GameSession
     public const int MaxNameLength = 20;
 
     private readonly SaveStore _store;
-    private readonly ResultLog _log;
 
-    public GameSession(SaveStore store, ResultLog log, LevelCatalog catalog)
+    public GameSession(SaveStore store, LevelCatalog catalog)
     {
         _store = store;
-        _log = log;
         Catalog = catalog;
         Data = store.Load();
     }
@@ -27,6 +25,16 @@ public sealed class GameSession
     public IReadOnlyList<LevelDefinition> Levels => Catalog.Levels;
 
     public UserProfile? User => Data.LastUser is null ? null : Data.FindUser(Data.LastUser);
+
+    public bool MusicOff
+    {
+        get => Data.MusicOff;
+        set
+        {
+            Data.MusicOff = value;
+            Save();
+        }
+    }
 
     public bool SoundOff
     {
@@ -77,12 +85,14 @@ public sealed class GameSession
     {
         if (Data.RemoveUser(name))
         {
-            _log.Delete(name);
             Save();
         }
     }
 
     public int? Stars(int level) => User?.Levels.GetValueOrDefault(level)?.Stars;
+
+    /// <summary>Уровень открыт, если пройден предыдущий. Первый открыт всегда.</summary>
+    public bool IsUnlocked(int level) => level <= 1 || Stars(level - 1) is not null;
 
     public RobotProgram LoadProgram(int level)
     {
@@ -127,25 +137,16 @@ public sealed class GameSession
         return progress.DecorationSeed.Value;
     }
 
-    /// <summary>Засчитывает прохождение: звёзды (лучший результат сохраняется) и строка в журнале.</summary>
-    public int RecordWin(LevelDefinition level, RobotProgram program, DateTime time)
+    /// <summary>Засчитывает прохождение. Сохраняется лучший результат.</summary>
+    public int RecordWin(LevelDefinition level, RobotProgram program)
     {
-        var stats = program.Stats;
-        var stars = level.Score(stats);
+        var stars = level.Score(program.Stats);
         if (User is { } user)
         {
             var progress = user.GetLevel(level.Number);
             progress.Stars = Math.Max(progress.Stars ?? 0, stars);
             progress.Program = program.ToString();
             Save();
-            try
-            {
-                _log.Append(user.Name, level.Number, stats, stars, time);
-            }
-            catch (IOException)
-            {
-                // Журнал вспомогательный: ошибка записи не должна мешать игре.
-            }
         }
         return stars;
     }

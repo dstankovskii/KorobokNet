@@ -16,7 +16,7 @@ public sealed class LevelScreen : Screen
 {
     private static readonly Dictionary<int, string> Intros = new()
     {
-        [1] = "Доставь ящик с растением на плодородную почву.\nНапиши программу на планшете и нажми ON.",
+        [1] = "Доставь ящик с растением на плодородную почву.\nНапиши программу на планшете и переведи переключатель в ON.",
         [5] = "Новое: условие.\nПоловина клеток «?» заражена радиацией. Условие проверяет клетку перед роботом: если там радиация — выполняется ветка «Да», иначе — ветка «Нет».",
         [9] = "Новое: цикл.\nЦикл повторяет команды внутри него несколько раз. Чтобы получить 3 звезды, используй цикл.",
     };
@@ -28,13 +28,19 @@ public sealed class LevelScreen : Screen
     private readonly Button _toggle;
     private readonly Button _tablet;
     private readonly Button _continue;
-    private readonly Button _menu;
+    private readonly Button _replay;
     private readonly Button _introOk;
     private BoardView _view = null!;
     private State _state;
     private int _stars;
     private float _starsTime;
-    private string? _message;
+    private float _failTime;
+    private bool _preview;
+
+    // Положение рычажка переключателя: 0 - OFF, 1 - ON. Двигается плавно.
+    private float _knob;
+    // Подсказка и кнопка, на которую она указывает.
+    private (string Text, Button Target)? _message;
     private string? _intro;
 
     public LevelScreen(KorobokGame game, LevelDefinition level, RobotProgram? demoProgram = null)
@@ -42,12 +48,13 @@ public sealed class LevelScreen : Screen
     {
         _level = level;
         _demoProgram = demoProgram;
-        _back = new Button(new RectangleF(40, 30, 150, 112), sprite: "back", onClick: GoBack);
-        _toggle = new Button(new RectangleF(Gfx.Width - 330, 30, 290, 140), sprite: "button_stop", onClick: Toggle);
-        _tablet = new Button(new RectangleF(Gfx.Width - 330, Gfx.Height - 250, 290, 220), sprite: "images", onClick: OpenProgram);
+        _back = BackButton(GoBack);
+        _toggle = new Button(new RectangleF(Gfx.Width - 330, 30, 290, 140), onClick: Toggle) { Painter = DrawSwitch };
+        _tablet = new Button(new RectangleF(Gfx.Width - 330, Gfx.Height - 250, 290, 220), onClick: OpenProgram) { Painter = DrawTablet };
         var result = ResultPanel;
-        _menu = new Button(new RectangleF(result.Center.X - 440, result.Bottom - 140, 360, 100), text: "Выйти в меню", onClick: GoBack) { TextSize = 42 };
-        _continue = Button.Primary(new RectangleF(result.Center.X - 40, result.Bottom - 140, 480, 100), "Следующий уровень", NextLevel);
+        var buttonsY = result.Bottom - 140;
+        _replay = new Button(new RectangleF(result.Center.X - 400, buttonsY, 370, 100), text: "Переиграть", onClick: Reset) { TextSize = 42 };
+        _continue = Button.Primary(new RectangleF(result.Center.X + 30, buttonsY, 370, 100), "Далее", NextLevel);
         _introOk = new Button(RectangleF.FromCenter(new Vector2(Gfx.Width / 2f, 760), 360, 100), text: "Понятно", onClick: () => _intro = null);
         Reset();
         if (!IsDemo && Intros.TryGetValue(level.Number, out var intro) && Game.Session.LoadProgram(level.Number).Instructions.Count == 0)
@@ -80,20 +87,14 @@ public sealed class LevelScreen : Screen
         _ => null,
     };
 
-    /// <summary>Для обучения: показать звёзды без прохождения.</summary>
-    public void ShowStars(int stars)
-    {
-        _stars = stars;
-        _starsTime = 10;
-    }
-
-    /// <summary>Для скриншот-тура: окно итогов без прохождения и без записи в сохранение.</summary>
+    /// <summary>Окно итогов без прохождения и без записи в сохранение: для обучения и скриншот-тура.</summary>
     public void PreviewResult(int stars)
     {
         _state = State.Won;
         _stars = stars;
         _starsTime = 10;
         _intro = null;
+        _preview = true;
     }
 
     public override void OnLeave()
@@ -107,6 +108,16 @@ public sealed class LevelScreen : Screen
         _routines.Update(dt);
         _view.Update(dt);
         _starsTime += dt;
+        if (_state == State.Failed && !IsDemo)
+        {
+            _failTime += dt;
+            if (_failTime > FailResetDelay)
+            {
+                ResetAfterFail();
+            }
+        }
+        var switchedOn = _state == State.Idle ? 0f : 1f;
+        _knob += Math.Clamp(switchedOn - _knob, -dt * 8, dt * 8);
 
         if (_intro is not null)
         {
@@ -121,15 +132,22 @@ public sealed class LevelScreen : Screen
 
         if (ShowResult)
         {
-            _continue.Text = _level.Number < Game.Session.Levels.Count ? "Следующий уровень" : "Дальше";
+            if (IsDemo)
+            {
+                return;
+            }
             if (!_continue.Update(input))
             {
-                _menu.Update(input);
+                _replay.Update(input);
             }
             input.ConsumePointer();
             if (input.KeyPressed(Keys.Enter) || input.KeyPressed(Keys.Space))
             {
                 NextLevel();
+            }
+            else if (input.KeyPressed(Keys.R))
+            {
+                Reset();
             }
             else if (input.KeyPressed(Keys.Escape))
             {
@@ -138,7 +156,6 @@ public sealed class LevelScreen : Screen
             return;
         }
 
-        _toggle.Sprite = _state == State.Idle ? "button_stop" : "button_play";
         _toggle.Enabled = _state != State.Won;
         _back.Enabled = !IsDemo;
         _tablet.Enabled = _state is not (State.Running or State.Won);
@@ -163,23 +180,16 @@ public sealed class LevelScreen : Screen
     public override void Draw(Gfx g)
     {
         g.SpriteFill("background", new RectangleF(0, 0, Gfx.Width, Gfx.Height));
+        DrawHorizon(g);
         _view.Draw(g);
 
         _back.Draw(g);
         _toggle.Draw(g);
         _tablet.Draw(g);
-        g.Text(_level.Number == 0 ? "Обучение" : $"Уровень: {_level.Number}", new Vector2(50, Gfx.Height - 100), 52, Color.White);
 
-        if (IsDemo)
+        if (_message is { } message)
         {
-            DrawStars(g, StarsArea, _starsTime);
-        }
-
-        if (_message is not null)
-        {
-            var panel = RectangleF.FromCenter(new Vector2(Gfx.Width / 2f, Gfx.Height - 110), 1100, 130);
-            g.Panel(panel, new Color(255, 248, 225, 240), new Color(60, 50, 40), 24, 3);
-            g.TextBlock(_message, panel.Inflate(-24), 38, new Color(40, 35, 30), bold: true);
+            Callout.Draw(g, message.Text, message.Target.Bounds, new RectangleF(24, 24, Gfx.Width - 48, Gfx.Height - 48), 38, 820);
         }
 
         if (_intro is not null)
@@ -205,6 +215,9 @@ public sealed class LevelScreen : Screen
             case State.Idle:
                 Run();
                 break;
+            case State.Failed when !IsDemo:
+                ResetAfterFail();
+                break;
             case State.Running:
             case State.Failed:
                 Reset();
@@ -215,11 +228,46 @@ public sealed class LevelScreen : Screen
     // Окно итогов появляется не сразу, чтобы было видно, как выросло растение.
     private const float ResultDelay = 0.8f;
 
-    private static RectangleF StarsArea => RectangleF.FromCenter(new Vector2(Gfx.Width / 2f, 110), 420, 150);
+    // После неудачи поле сбрасывается само, но не сразу: пусть будет видно, где робот застрял.
+    private const float FailResetDelay = 1.5f;
 
     private static RectangleF ResultPanel => RectangleF.FromCenter(new Vector2(Gfx.Width / 2f, Gfx.Height / 2f), 1040, 580);
 
-    private bool ShowResult => !IsDemo && _state == State.Won && _starsTime > ResultDelay;
+    private static RectangleF StarsArea => RectangleF.FromCenter(new Vector2(ResultPanel.Center.X, ResultPanel.Y + 220), 420, 150);
+
+    /// <summary>Полоска неба у верхнего края, цвета взяты с заставки. Без неё песок кажется стеной, а не землёй.</summary>
+    private static void DrawHorizon(Gfx g)
+    {
+        var sky = new RectangleF(0, 0, Gfx.Width, 110);
+        var horizon = new Color(254, 230, 227);
+        g.Gradient(sky, new Color(212, 192, 190), horizon);
+        g.Gradient(new RectangleF(0, sky.Bottom, Gfx.Width, 60), horizon, Color.Transparent);
+    }
+
+    /// <summary>Переключатель: выключен, пока программа не запущена; включён, пока робот едет и до сброса.</summary>
+    private void DrawSwitch(Gfx g, RectangleF r, Color tint) => Switch.Draw(g, r, _knob, tint);
+
+    /// <summary>Значок планшета: экран с двумя блоками программы.</summary>
+    private static void DrawTablet(Gfx g, RectangleF r, Color tint)
+    {
+        var body = RectangleF.FromCenter(r.Center, r.Width * 0.92f, r.Height * 0.86f);
+        var screen = body.Inflate(-16);
+        g.RoundRect(body.Offset(new Vector2(0, 8)), 30, Gfx.Tint(Color.Black * 0.3f, tint));
+        g.RoundRect(body, 30, Gfx.Tint(new Color(44, 48, 56), tint));
+        g.RoundRect(screen, 14, Gfx.Tint(new Color(96, 178, 226), tint));
+        g.Circle(new Vector2(body.Center.X, body.Y + 8), 3, Gfx.Tint(new Color(90, 96, 108), tint));
+
+        var height = screen.Height * 0.66f;
+        var width = height * 0.8f;
+        var y = screen.Center.Y - height / 2;
+        var left = new RectangleF(screen.X + screen.Width * 0.3f - width / 2, y, width, height);
+        var right = new RectangleF(screen.X + screen.Width * 0.7f - width / 2, y, width, height);
+        g.Line(left.Center, right.Center, 5, Gfx.Tint(new Color(40, 40, 40), tint));
+        Blocks.Draw(g, left, Blocks.Control, "start", tint);
+        Blocks.Draw(g, right, Blocks.Action, "forward", tint);
+    }
+
+    private bool ShowResult => (!IsDemo || _preview) && _state == State.Won && _starsTime > ResultDelay;
 
     private RobotProgram Program => _demoProgram ?? Game.Session.LoadProgram(_level.Number);
 
@@ -228,7 +276,7 @@ public sealed class LevelScreen : Screen
         var program = Program;
         if (program.Instructions.Count == 0)
         {
-            _message = "Программа пустая. Нажми на планшет, чтобы написать команды.";
+            _message = ("Программа пустая. Нажми на планшет, чтобы написать команды.", _tablet);
             return;
         }
         _message = null;
@@ -239,11 +287,11 @@ public sealed class LevelScreen : Screen
             if (!won)
             {
                 _state = State.Failed;
-                _message = IsDemo ? null : "Растение не доставлено. Нажми OFF, измени программу и попробуй ещё раз.";
+                _failTime = 0;
                 return;
             }
             _state = State.Won;
-            _stars = IsDemo ? _level.Score(program.Stats) : Game.Session.RecordWin(_level, program, DateTime.Now);
+            _stars = IsDemo ? _level.Score(program.Stats) : Game.Session.RecordWin(_level, program);
             _starsTime = 0;
         }));
     }
@@ -257,7 +305,14 @@ public sealed class LevelScreen : Screen
         _view = new BoardView(Assets, Game.Audio, board, seed);
         _state = State.Idle;
         _stars = 0;
+        _preview = false;
         _message = null;
+    }
+
+    private void ResetAfterFail()
+    {
+        Reset();
+        _message = ("Растение не доставлено. Измени программу на планшете и попробуй ещё раз.", _tablet);
     }
 
     private void DrawResult(Gfx g)
@@ -265,12 +320,17 @@ public sealed class LevelScreen : Screen
         var panel = ResultPanel;
         g.Rect(new RectangleF(0, 0, Gfx.Width, Gfx.Height), Color.Black * 0.5f);
         g.Panel(panel, new Color(255, 248, 225), new Color(60, 50, 40), 30, 4);
-        var title = _level.Number == 0 ? "Обучение пройдено!" : $"Уровень {_level.Number} пройден!";
+        var title = IsDemo ? "Уровень пройден!" : _level.Number == 0 ? "Обучение пройдено!" : $"Уровень {_level.Number} пройден!";
         g.Text(title, new Vector2(panel.Center.X, panel.Y + 40), 64, new Color(40, 35, 30), Align.Center, bold: true);
-        DrawStars(g, RectangleF.FromCenter(new Vector2(panel.Center.X, panel.Y + 220), 420, 150), _starsTime - ResultDelay);
+        DrawStars(g, StarsArea, _starsTime - ResultDelay);
+        if (IsDemo)
+        {
+            // В обучении под звёздами встаёт табличка с объяснением.
+            return;
+        }
         var hint = _stars >= 3 ? "Отлично! Все звёзды собраны." : "Сделай программу короче — и звёзд будет больше.";
         g.Text(hint, new Vector2(panel.Center.X, panel.Y + 315), 36, new Color(90, 80, 70), Align.Center);
-        _menu.Draw(g);
+        _replay.Draw(g);
         _continue.Draw(g);
     }
 

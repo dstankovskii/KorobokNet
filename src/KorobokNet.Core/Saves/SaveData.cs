@@ -5,6 +5,9 @@ public sealed class SaveData
 {
     public string? LastUser { get; set; }
 
+    public bool MusicOff { get; set; }
+
+    /// <summary>Звуки игры без музыки: щелчки, мотор, победа.</summary>
     public bool SoundOff { get; set; }
 
     public List<UserProfile> Users { get; set; } = [];

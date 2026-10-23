@@ -121,6 +121,51 @@ public class ProgramEditorTests
     }
 
     [Fact]
+    public void RemoveKeepsCursorAtSameBlock()
+    {
+        var editor = Editor("F L R");
+
+        Assert.True(editor.Remove(editor.Root[0]));
+
+        Assert.Equal("L R", Text(editor));
+        Assert.Equal(2, editor.Cursor.Index);
+    }
+
+    [Fact]
+    public void RemoveNestedCommand()
+    {
+        var editor = Editor("F 2(L ?(B|R))");
+        var loop = Assert.IsType<EditLoop>(editor.Root[1]);
+        var iff = Assert.IsType<EditIf>(loop.Body[1]);
+
+        Assert.True(editor.Remove(iff.Else[0]));
+
+        Assert.Equal("F 2(L ?(B|))", Text(editor));
+    }
+
+    [Fact]
+    public void RemoveBlockWithCursorInsideMovesCursorToItsPlace()
+    {
+        var editor = Editor("F 3(F R) L");
+        var loop = editor.Root[1];
+        editor.SetCursor(new EditorSlot(((EditLoop)loop).Body, 1));
+
+        Assert.True(editor.Remove(loop));
+
+        Assert.Equal("F L", Text(editor));
+        Assert.Equal(new EditorSlot((List<EditNode>)editor.Root, 1), editor.Cursor);
+    }
+
+    [Fact]
+    public void RemoveUnknownNodeDoesNothing()
+    {
+        var editor = Editor("F");
+
+        Assert.False(editor.Remove(new EditCommand(Command.Back)));
+        Assert.Equal("F", Text(editor));
+    }
+
+    [Fact]
     public void CursorVisitsEverySlotInReadingOrder()
     {
         var editor = Editor("?(F|L) 2(B)");

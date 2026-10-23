@@ -15,6 +15,7 @@ public sealed class Input
     private KeyboardState _keys;
     private KeyboardState _prevKeys;
     private int _prevWheel;
+    private int _prevWheelX;
     private bool _wasDown;
 
     public Vector2 Pointer { get; private set; }
@@ -24,6 +25,9 @@ public sealed class Input
 
     /// <summary>Прокрутка колесом за кадр (положительная - вверх).</summary>
     public int Wheel { get; private set; }
+
+    /// <summary>Прокрутка вбок за кадр (тачпад, наклон колеса; положительная - вправо).</summary>
+    public int WheelX { get; private set; }
 
     /// <summary>Символы, набранные за кадр (включая '\b' и '\r').</summary>
     public IReadOnlyList<char> Typed => _typed;
@@ -55,6 +59,8 @@ public sealed class Input
             down = windowActive && mouse.LeftButton == ButtonState.Pressed;
             Wheel = mouse.ScrollWheelValue - _prevWheel;
             _prevWheel = mouse.ScrollWheelValue;
+            WheelX = mouse.HorizontalScrollWheelValue - _prevWheelX;
+            _prevWheelX = mouse.HorizontalScrollWheelValue;
         }
         SetPointer(down);
     }
@@ -65,6 +71,7 @@ public sealed class Input
         IsScripted = true;
         Pointer = position;
         Wheel = 0;
+        WheelX = 0;
         _typed.Clear();
         SetPointer(down);
     }

@@ -22,13 +22,17 @@ public enum Demo
     None,
     Ride,
     Program,
+    Delete,
     Perform,
 }
 
-/// <summary>Шаг обучения: табличка с текстом поверх экрана игры, стрелка на элемент Arrow и демонстрация.</summary>
-public sealed record StoryStep(Backdrop Backdrop, string Text, string? Arrow = null, Demo Demo = Demo.None)
+/// <summary>
+/// Шаг обучения: табличка с текстом поверх экрана игры и демонстрация.
+/// Если задан Target, табличка встаёт рядом с этим элементом и указывает на него хвостиком.
+/// </summary>
+public sealed record StoryStep(Backdrop Backdrop, string Text, string? Target = null, Demo Demo = Demo.None)
 {
-    // null - табличка сверху по центру.
+    // Где стоит табличка без Target; null - сверху по центру.
     public RectangleF? Panel { get; init; }
 
     public string? Program { get; init; }
@@ -48,25 +52,27 @@ public sealed class StoryScreen : Screen
         new(Backdrop.Start, "Для рассадки этого растения по всей планете был сконструирован робот с кодовым именем «Коробок»."),
         new(Backdrop.Level, "Нужно запрограммировать робота так, чтобы он доставил растение на плодородную почву.", Demo: Demo.Ride),
         new(Backdrop.QuestLevel, "Ровно половина клеток, отмеченных «?», заражена радиацией. Робот сканирует клетку, на которую смотрит. Какая из клеток заражена, заранее узнать нельзя. Через радиацию робот не может ехать и толкать ящики."),
-        new(Backdrop.Level, "Чтобы написать команды для робота — жми на планшет.", Arrow: "tablet"),
-        new(Backdrop.Program, "Здесь пишется программа.", Arrow: "program") { Panel = new RectangleF(250, 330, 900, 160) },
-        new(Backdrop.Program, "Справа отображается мини-карта.", Arrow: "minimap") { Panel = new RectangleF(250, 330, 900, 160) },
-        new(Backdrop.Program, "Снизу находится панель команд Коробка.", Arrow: "palette") { Panel = new RectangleF(250, 330, 900, 160) },
-        new(Backdrop.Program, "Новая команда вставляется после выделенного блока. Нажми на блок, чтобы выделить его, или двигай выделение стрелками.", Arrow: "right")
+        new(Backdrop.Level, "Чтобы написать команды для робота — жми на планшет.", Target: "tablet"),
+        new(Backdrop.Program, "Здесь пишется программа.", Target: "program"),
+        new(Backdrop.Program, "Справа отображается мини-карта.", Target: "minimap"),
+        new(Backdrop.Program, "Снизу находится панель команд Коробка.", Target: "palette"),
+        new(Backdrop.Program, "Новая команда вставляется после выделенного блока. Нажми на блок, чтобы выделить его. Длинную программу можно листать стрелками по бокам.", Target: "program")
         {
-            Panel = new RectangleF(250, 330, 1000, 200),
             Program = "L F F",
         },
-        new(Backdrop.Program, "Удалить выделенную команду.", Arrow: "backspace") { Panel = new RectangleF(250, 380, 900, 140), Program = "L F F" },
-        new(Backdrop.Program, "Удалить все команды.", Arrow: "clear") { Panel = new RectangleF(250, 380, 900, 140), Program = "L F F" },
-        new(Backdrop.Program, "Нажимай на команды внизу — они добавятся в программу.", Demo: Demo.Program) { Panel = new RectangleF(250, 420, 1000, 140) },
-        new(Backdrop.Program, "Нажми «Готово», чтобы вернуться на поле и запустить программу.", Arrow: "back") { Panel = new RectangleF(250, 330, 900, 160), Program = "L F" },
-        new(Backdrop.Level, "Чтобы запустить программу, нужно нажать эту кнопку.", Arrow: "play"),
+        new(Backdrop.Program, "Чтобы удалить блок, наведи на него мышку и нажми на крестик.", Demo: Demo.Delete)
+        {
+            Program = "L F F",
+            Panel = new RectangleF(215, 510, 1000, 140),
+        },
+        new(Backdrop.Program, "А эта кнопка удаляет все команды сразу.", Target: "clear") { Program = "L F F" },
+        new(Backdrop.Program, "Нажимай на команды внизу — они добавятся в программу.", Demo: Demo.Program) { Panel = new RectangleF(215, 510, 1000, 140) },
+        new(Backdrop.Program, "Нажми «Готово», чтобы вернуться на поле и запустить программу.", Target: "done") { Program = "L F" },
+        new(Backdrop.Level, "Чтобы запустить программу, переведи переключатель в ON.", Target: "play"),
         new(Backdrop.Level, "Робот выполнит команды по порядку. Если ящик окажется на почве — вырастет растение!", Demo: Demo.Perform),
-        new(Backdrop.Level, "За успешное прохождение уровня даются баллы, от 1 до 3. Чем короче программа, тем больше баллов.", Arrow: "stars")
+        new(Backdrop.Level, "За пройденный уровень даются звёзды, от 1 до 3. Чем короче программа, тем больше звёзд.", Target: "stars")
         {
             ShowStars = true,
-            Panel = new RectangleF(360, 300, 1200, 200),
         },
         new(Backdrop.Start, "Вот и все правила. Теперь помоги Коробку спасти планету!"),
     ];
@@ -79,6 +85,9 @@ public sealed class StoryScreen : Screen
     private static readonly RectangleF DefaultPanel = new(360, 60, 1200, 260);
     private const float NavHeight = 80;
     private const float NavY = Gfx.Height - NavHeight - 12;
+
+    // Таблички с хвостиком не должны залезать на кнопки "Назад" и "Далее".
+    private static readonly RectangleF CalloutRoom = new(24, 24, Gfx.Width - 48, NavY - 40);
 
     private readonly IReadOnlyList<StoryStep> _steps;
     private readonly Coroutines _script = new();
@@ -168,22 +177,24 @@ public sealed class StoryScreen : Screen
             _backdrop.Draw(g);
         }
 
-        var panel = Step.Panel ?? DefaultPanel;
-        if (_index == 0 && _steps == Intro && Game.Session.User is { } user)
+        if (Step.Target is { } anchor && _backdrop?.Anchor(anchor) is { } target)
         {
-            g.Text($"Привет, {user.Name}!", new Vector2(panel.Center.X, panel.Y - 4), 60, Color.White, Align.Center);
-            panel = panel.Offset(new Vector2(0, 80));
+            Callout.Draw(g, Step.Text, target, CalloutRoom);
         }
-        g.Panel(panel, new Color(255, 242, 210, 250), new Color(40, 35, 30), 26, 4);
-        g.TextBlock(Step.Text, panel.Inflate(-36), 46, new Color(30, 25, 20), bold: true);
-
-        if (Step.Arrow is { } anchor && _backdrop?.Anchor(anchor) is { } target)
+        else
         {
-            DrawArrow(g, panel, target);
+            var panel = Step.Panel ?? DefaultPanel;
+            if (_index == 0 && _steps == Intro && Game.Session.User is { } user)
+            {
+                g.Text($"Привет, {user.Name}!", new Vector2(panel.Center.X, panel.Y - 4), 60, Color.White, Align.Center);
+                panel = panel.Offset(new Vector2(0, 80));
+            }
+            g.Panel(panel, Callout.Fill, Callout.Border, 26, 4);
+            g.TextBlock(Step.Text, panel.Inflate(-36), 46, Callout.Ink, bold: true);
         }
         if (_fingerVisible)
         {
-            g.Circle(_finger, _fingerDown ? 26 : 34, new Color(255, 235, 60) * 0.7f);
+            DrawHand(g);
         }
 
         _prev.Draw(g);
@@ -236,7 +247,7 @@ public sealed class StoryScreen : Screen
                 var level = new LevelScreen(Game, _tutorial, program);
                 if (step.ShowStars)
                 {
-                    level.ShowStars(3);
+                    level.PreviewResult(3);
                 }
                 return level;
         }
@@ -275,6 +286,19 @@ public sealed class StoryScreen : Screen
                     yield return Click();
                     break;
 
+                case Demo.Delete:
+                    // Наведение на блок показывает крестик, нажатие на крестик удаляет блок.
+                    yield return MoveTo("last-block");
+                    yield return 0.8f;
+                    yield return MoveTo("last-block.delete");
+                    yield return Click();
+                    yield return 1f;
+                    yield return MoveAway();
+                    yield return 1f;
+                    _backdrop?.OnLeave();
+                    _backdrop = CreateBackdrop(Step);
+                    break;
+
                 case Demo.Ride:
                 case Demo.Perform:
                     var level = (LevelScreen)_backdrop!;
@@ -300,6 +324,21 @@ public sealed class StoryScreen : Screen
         yield return MoveTo(target.Center, 0.7f);
     }
 
+    /// <summary>Рука, которая показывает, куда нажимать. При нажатии она прижимается, и под пальцем расходится круг.</summary>
+    private void DrawHand(Gfx g)
+    {
+        var size = _fingerDown ? 108f : 120f;
+        var area = new RectangleF(_finger.X - size * Icons.HandTip.X, _finger.Y - size * Icons.HandTip.Y, size, size);
+        if (_fingerDown)
+        {
+            g.Circle(_finger, 34, Color.White * 0.35f);
+            g.Circle(_finger, 22, Color.White * 0.5f);
+        }
+        var lift = _fingerDown ? new Vector2(3, 4) : new Vector2(9, 12);
+        Icons.Draw(g, "hand", area.Offset(lift), Color.Black * 0.3f);
+        Icons.Draw(g, "hand", area);
+    }
+
     private IEnumerator MoveAway() => MoveTo(new Vector2(Gfx.Width - 200, Gfx.Height / 2f), 0.6f);
 
     private IEnumerator MoveTo(Vector2 to, float seconds)
@@ -320,37 +359,5 @@ public sealed class StoryScreen : Screen
         yield return 0.15f;
         _fingerDown = false;
         yield return 0.3f;
-    }
-
-    /// <summary>Красная стрелка от таблички к элементу интерфейса.</summary>
-    private static void DrawArrow(Gfx g, RectangleF panel, RectangleF target)
-    {
-        var color = new Color(215, 25, 25);
-        var start = EdgePoint(panel, target.Center);
-        var end = EdgePoint(target.Inflate(14), panel.Center);
-        var direction = end - start;
-        if (direction.LengthSquared() < 1)
-        {
-            return;
-        }
-        direction.Normalize();
-        var normal = new Vector2(-direction.Y, direction.X);
-        g.Line(start, end - direction * 10, 14, color);
-        g.Line(end, end - direction * 60 + normal * 40, 14, color);
-        g.Line(end, end - direction * 60 - normal * 40, 14, color);
-    }
-
-    /// <summary>Точка на границе прямоугольника по направлению к <paramref name="toward"/>.</summary>
-    private static Vector2 EdgePoint(RectangleF rect, Vector2 toward)
-    {
-        var center = rect.Center;
-        var d = toward - center;
-        if (d == Vector2.Zero)
-        {
-            return center;
-        }
-        var tx = d.X == 0 ? float.MaxValue : rect.Width / 2 / Math.Abs(d.X);
-        var ty = d.Y == 0 ? float.MaxValue : rect.Height / 2 / Math.Abs(d.Y);
-        return center + d * Math.Min(Math.Min(tx, ty), 1f);
     }
 }

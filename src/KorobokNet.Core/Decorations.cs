@@ -1,42 +1,58 @@
 namespace KorobokNet.Core;
 
-public enum DecorationKind
-{
-    Trash,
-    Tree1,
-    Tree2,
-}
-
-/// <summary>Украшение вокруг поля. Координаты в тех же клетках, что и поле, но за его пределами.</summary>
-public sealed record Decoration(DecorationKind Kind, GridPos Cell);
+/// <summary>Кучка камней вокруг поля. Координаты в тех же клетках, что и поле, но за его пределами.</summary>
+public sealed record Decoration(GridPos Cell);
 
 public static class DecorationGenerator
 {
-    private const int Attempts = 25;
+    public const int MaxCount = 14;
 
     /// <summary>
-    /// Как в MapScript.Start: 25 случайных клеток вокруг поля; в нижней половине экрана мусор,
-    /// в верхней - деревья. Одинаковый seed даёт одинаковую картинку, поэтому seed хранится в сохранении.
+    /// Случайные клетки песка вокруг поля, которые видны на экране. Соседние клетки не берутся,
+    /// иначе кучки камней сливаются в одну. Одинаковый seed даёт одинаковую картинку,
+    /// поэтому seed хранится в сохранении.
     /// </summary>
     public static IReadOnlyList<Decoration> Generate(int seed)
     {
-        var random = new Random(seed);
-        var result = new List<Decoration>();
-        for (var k = 0; k < Attempts; k++)
+        var cells = new List<GridPos>();
+        for (var x = -10; x <= 20; x++)
         {
-            var x = random.Next(-5, 15);
-            var y = random.Next(-7, 13);
-            if (x >= -1 && y >= -1 && x <= LevelDefinition.BoardSize - 1 && y <= LevelDefinition.BoardSize - 1)
+            for (var y = -10; y <= 20; y++)
             {
-                continue;
+                if (Allowed(x, y))
+                {
+                    cells.Add(new GridPos(x, y));
+                }
             }
+        }
 
-            // В оригинале: экранный Y = -0.36 + 0.42*(X - Y) < 0, то есть X - Y ≤ 0.
-            var kind = x - y <= 0
-                ? DecorationKind.Trash
-                : random.Next(0, 2) == 0 ? DecorationKind.Tree1 : DecorationKind.Tree2;
-            result.Add(new Decoration(kind, new GridPos(x, y)));
+        var shuffled = cells.ToArray();
+        new Random(seed).Shuffle(shuffled);
+        var result = new List<Decoration>();
+        foreach (var c in shuffled)
+        {
+            if (result.Count < MaxCount && result.All(d => !Touches(d.Cell, c)))
+            {
+                result.Add(new Decoration(c));
+            }
         }
         return result;
     }
+
+    /// <summary>
+    /// На экране клетка (X, Y) сдвигается вправо на X + Y и вверх на X - Y.
+    /// Отсюда границы: края экрана, кнопка планшета в правом нижнем углу и середина поля
+    /// (X - Y = 0). Выше неё камни выглядят висящими в воздухе.
+    /// </summary>
+    public static bool Allowed(int x, int y)
+    {
+        var onBoard = x >= -1 && y >= -1 && x <= LevelDefinition.BoardSize && y <= LevelDefinition.BoardSize;
+        var across = x + y;
+        var up = x - y;
+        var onScreen = across is >= 0 and <= 15 && up is >= -10 and <= 0;
+        var underTablet = across >= 12 && up <= -5;
+        return !onBoard && onScreen && !underTablet;
+    }
+
+    public static bool Touches(GridPos a, GridPos b) => Math.Abs(a.X - b.X) <= 1 && Math.Abs(a.Y - b.Y) <= 1;
 }

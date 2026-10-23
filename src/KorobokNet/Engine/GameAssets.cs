@@ -57,6 +57,7 @@ public sealed class GameAssets : IDisposable
     private readonly Dictionary<string, Texture2D> _textures = [];
     private readonly Dictionary<string, SpriteDef> _sprites = [];
     private readonly Dictionary<string, AnimationClip> _animations = [];
+    private readonly Dictionary<string, Texture2D> _painted = [];
     private readonly Dictionary<string, SpriteDto> _spriteData;
     private readonly FontSystem _regular = new();
     private readonly FontSystem _bold = new();
@@ -74,11 +75,16 @@ public sealed class GameAssets : IDisposable
             var frames = dto.Frames.Select(f => ((float)f.Time, Sprite(f.Sprite))).ToList();
             _animations[name] = new AnimationClip(name, dto.Loop, (float)dto.Length, frames);
         }
-        _regular.AddFont(ReadBytes("Fonts/PT_Sans-Web-Regular.ttf"));
-        _bold.AddFont(ReadBytes("Fonts/PT_Sans-Web-Bold.ttf"));
+        _regular.AddFont(ReadBytes("Fonts/Nunito-SemiBold.ttf"));
+        _bold.AddFont(ReadBytes("Fonts/Nunito-ExtraBold.ttf"));
         Pixel = new Texture2D(device, 1, 1);
         Pixel.SetData([Color.White]);
         Circle = CreateCircle(device, 64);
+        // Текстуры грузятся сразу: если читать их по требованию, первый показ экрана подвисает.
+        foreach (var texture in _spriteData.Values.Select(s => s.Texture).Distinct())
+        {
+            Texture(texture);
+        }
     }
 
     public Texture2D Pixel { get; }
@@ -96,6 +102,17 @@ public sealed class GameAssets : IDisposable
             using var stream = Open($"Textures/{name}.png");
             texture = Texture2D.FromStream(_device, stream, DefaultColorProcessors.PremultiplyAlpha);
             _textures[name] = texture;
+        }
+        return texture;
+    }
+
+    /// <summary>Текстура, нарисованная кодом; рисуется один раз на ключ.</summary>
+    public Texture2D Painted(string key, Func<Canvas> paint)
+    {
+        if (!_painted.TryGetValue(key, out var texture))
+        {
+            texture = paint().ToTexture(_device);
+            _painted[key] = texture;
         }
         return texture;
     }
@@ -125,7 +142,7 @@ public sealed class GameAssets : IDisposable
 
     public void Dispose()
     {
-        foreach (var texture in _textures.Values)
+        foreach (var texture in _textures.Values.Concat(_painted.Values))
         {
             texture.Dispose();
         }

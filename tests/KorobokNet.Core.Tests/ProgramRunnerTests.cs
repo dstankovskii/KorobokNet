@@ -62,6 +62,20 @@ public class ProgramRunnerTests
         Assert.Equal(expected, board.Heading);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void IfReportsWhatRobotSaw(bool radiation)
+    {
+        var board = new Board(Make("west", "k?0000", Empty, Empty, Empty, Empty, CubeAndSoil), radiation ? [Cell(0, 1)] : []);
+        var runner = new ProgramRunner(board, RobotProgram.Parse("?(L|R)"));
+
+        var events = runner.Step();
+
+        Assert.Equal(new ConditionCheckedEvent(Cell(0, 1), radiation), events[0]);
+        Assert.IsType<TurnedEvent>(events[1]);
+    }
+
     [Fact]
     public void IfInsideLoopIsCheckedOnEveryIteration()
     {

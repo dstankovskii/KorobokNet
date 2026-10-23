@@ -16,4 +16,7 @@ public sealed record BlockedEvent(GridPos At, GridPos Target, bool Backward) : G
 /// <summary>Робот посмотрел на клетку "?" и узнал, что в ней.</summary>
 public sealed record QuestRevealedEvent(GridPos Cell, bool IsRadiation) : GameEvent;
 
+/// <summary>Робот проверил условие "впереди радиация?" и выбрал ветку.</summary>
+public sealed record ConditionCheckedEvent(GridPos Cell, bool IsRadiation) : GameEvent;
+
 public sealed record LevelWonEvent : GameEvent;

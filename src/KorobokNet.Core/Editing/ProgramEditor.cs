@@ -158,6 +158,31 @@ public sealed class ProgramEditor
         return true;
     }
 
+    /// <summary>
+    /// Удаляет блок (условие или цикл - вместе с содержимым). Курсор остаётся у того же блока,
+    /// а если он был внутри удалённого, встаёт на его место.
+    /// </summary>
+    public bool Remove(EditNode node)
+    {
+        if (FindPlace(_root, node) is not { } place)
+        {
+            return false;
+        }
+        var (seq, index) = place;
+        var cursorInside = IsWithin(Cursor.Sequence, node);
+        seq.RemoveAt(index);
+        if (cursorInside)
+        {
+            Cursor = new EditorSlot(seq, index);
+        }
+        else if (ReferenceEquals(Cursor.Sequence, seq) && Cursor.Index > index)
+        {
+            Cursor = new EditorSlot(seq, Cursor.Index - 1);
+        }
+        Changed?.Invoke();
+        return true;
+    }
+
     public void Clear()
     {
         _root.Clear();
@@ -239,6 +264,39 @@ public sealed class ProgramEditor
             seq = owner.ParentSequence;
         }
         return false;
+    }
+
+    /// <summary>Лежит ли список где-то внутри блока <paramref name="node"/>.</summary>
+    private bool IsWithin(List<EditNode> seq, EditNode node)
+    {
+        while (FindOwner(_root, seq) is { } owner)
+        {
+            if (ReferenceEquals(owner.Node, node))
+            {
+                return true;
+            }
+            seq = owner.ParentSequence;
+        }
+        return false;
+    }
+
+    private static EditorSlot? FindPlace(List<EditNode> seq, EditNode node)
+    {
+        for (var i = 0; i < seq.Count; i++)
+        {
+            if (ReferenceEquals(seq[i], node))
+            {
+                return new EditorSlot(seq, i);
+            }
+            foreach (var child in Children(seq[i]))
+            {
+                if (FindPlace(child, node) is { } found)
+                {
+                    return found;
+                }
+            }
+        }
+        return null;
     }
 
     /// <summary>Блок (условие/цикл), которому принадлежит список, и где этот блок лежит.</summary>

@@ -21,7 +21,8 @@ public sealed class Audio : IDisposable
     private readonly SoundEffect? _motorSound;
     private readonly SoundEffectInstance? _motor;
     private readonly Song? _music;
-    private bool _muted;
+    private bool _musicMuted;
+    private bool _soundMuted;
     private float _musicPauseLeft;
 
     public Audio()
@@ -45,13 +46,23 @@ public sealed class Audio : IDisposable
         }
     }
 
-    public bool Muted
+    public bool MusicMuted
     {
-        get => _muted;
+        get => _musicMuted;
         set
         {
-            _muted = value;
+            _musicMuted = value;
             MediaPlayer.IsMuted = value;
+        }
+    }
+
+    /// <summary>Все звуки, кроме музыки.</summary>
+    public bool SoundMuted
+    {
+        get => _soundMuted;
+        set
+        {
+            _soundMuted = value;
             SoundEffect.MasterVolume = value ? 0f : 1f;
         }
     }

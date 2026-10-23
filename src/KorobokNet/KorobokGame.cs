@@ -71,10 +71,16 @@ public sealed class KorobokGame : Game
         SwitchScreen();
     }
 
+    public void ToggleMusic()
+    {
+        Session.MusicOff = !Session.MusicOff;
+        Audio.MusicMuted = Session.MusicOff;
+    }
+
     public void ToggleSound()
     {
         Session.SoundOff = !Session.SoundOff;
-        Audio.Muted = Session.SoundOff;
+        Audio.SoundMuted = Session.SoundOff;
     }
 
     protected override void Initialize()
@@ -109,18 +115,20 @@ public sealed class KorobokGame : Game
         {
             File.Delete(_options.SaveFile);
         }
-        Session = new GameSession(new SaveStore(_options.SaveFile), new ResultLog(_options.ResultsDirectory), LevelLoader.LoadCatalog());
+        Session = new GameSession(new SaveStore(_options.SaveFile), LevelLoader.LoadCatalog());
         Button.ClickSound = () => Audio.Play(Sfx.Click);
 
         if (_options.TourDirectory is not null)
         {
-            Audio.Muted = true;
+            Audio.MusicMuted = true;
+            Audio.SoundMuted = true;
             Session.CreateUser("Тест");
             _tour = new ScreenshotTour(this, _options.TourDirectory);
             return;
         }
 
-        Audio.Muted = Session.SoundOff;
+        Audio.MusicMuted = Session.MusicOff;
+        Audio.SoundMuted = Session.SoundOff;
         Audio.StartMusic();
         Show(new StartScreen(this));
     }

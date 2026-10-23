@@ -10,11 +10,16 @@ public enum BlockKind
     TurnLeft,
     TurnRight,
 
-    /// <summary>Начало условия; через него курсор ставится в начало ветки "Да".</summary>
+    /// <summary>Проверка "впереди радиация?". Своей позиции курсора у неё нет.</summary>
     IfStart,
 
-    /// <summary>Метка "Нет" под условием: начало ветки "Нет".</summary>
+    /// <summary>Метка "Да" справа от проверки: начало ветки "Да".</summary>
+    IfThen,
+
+    /// <summary>Метка "Нет" под меткой "Да": начало ветки "Нет".</summary>
     IfElse,
+
+    /// <summary>Слияние веток; через него курсор ставится после условия.</summary>
     IfEnd,
 
     /// <summary>Начало цикла (с числом повторов); через него курсор ставится в начало тела.</summary>
@@ -26,13 +31,17 @@ public enum BlockKind
 /// Блок на экране редактора. Нажатие на блок ставит курсор в <see cref="Slot"/> - новые блоки
 /// вставляются сразу после него.
 /// </summary>
-public sealed record LayoutBlock(BlockKind Kind, int Column, int Row, EditorSlot Slot, EditNode? Node);
+public sealed record LayoutBlock(BlockKind Kind, int Column, int Row, EditorSlot? Slot, EditNode? Node)
+{
+    public bool Holds(EditorSlot slot) => Slot is { } own && own.Equals(slot);
+}
 
 /// <summary>Соединительная линия между центрами клеток сетки.</summary>
 public readonly record struct LayoutLink(int FromColumn, int FromRow, int ToColumn, int ToRow);
 
 /// <summary>
-/// Раскладка программы по сетке: основная строка слева направо, ветка "Нет" - строкой ниже.
+/// Раскладка программы по сетке: основная строка слева направо. Условие расходится на две строки:
+/// ветка "Да" продолжает строку, ветка "Нет" идёт ниже, а в конце они сходятся в блоке слияния.
 /// </summary>
 public sealed class ProgramLayout
 {
@@ -59,7 +68,7 @@ public sealed class ProgramLayout
         return layout;
     }
 
-    public LayoutBlock CursorBlock(ProgramEditor editor) => _blocks.First(b => b.Slot.Equals(editor.Cursor));
+    public LayoutBlock CursorBlock(ProgramEditor editor) => _blocks.First(b => b.Holds(editor.Cursor));
 
     /// <summary>Раскладывает список, начиная с колонки <paramref name="column"/>; возвращает следующую свободную колонку и высоту в строках.</summary>
     private (int End, int Height) Place(List<EditNode> seq, int column, int row, int linkFrom)
@@ -92,12 +101,18 @@ public sealed class ProgramLayout
 
                 case EditIf iff:
                 {
-                    Add(BlockKind.IfStart, column, row, new EditorSlot(iff.Then, 0), iff);
-                    var (thenEnd, thenHeight) = Place(iff.Then, column + 1, row, column);
+                    var fork = column;
+                    Add(BlockKind.IfStart, fork, row, null, iff);
+                    Add(BlockKind.IfThen, fork + 1, row, new EditorSlot(iff.Then, 0), iff);
+                    Link(fork, row, fork + 1, row);
+                    var (thenEnd, thenHeight) = Place(iff.Then, fork + 2, row, fork + 1);
+
                     var elseRow = row + thenHeight;
-                    Add(BlockKind.IfElse, column, elseRow, new EditorSlot(iff.Else, 0), iff);
-                    _links.Add(new LayoutLink(column, row, column, elseRow));
-                    var (elseEnd, elseHeight) = Place(iff.Else, column + 1, elseRow, column);
+                    Add(BlockKind.IfElse, fork + 1, elseRow, new EditorSlot(iff.Else, 0), iff);
+                    _links.Add(new LayoutLink(fork, row, fork, elseRow));
+                    _links.Add(new LayoutLink(fork, elseRow, fork + 1, elseRow));
+                    var (elseEnd, elseHeight) = Place(iff.Else, fork + 2, elseRow, fork + 1);
+
                     var end = Math.Max(thenEnd, elseEnd);
                     Link(thenEnd - 1, row, end, row);
                     _links.Add(new LayoutLink(elseEnd - 1, elseRow, end, elseRow));
@@ -121,7 +136,7 @@ public sealed class ProgramLayout
         }
     }
 
-    private void Add(BlockKind kind, int column, int row, EditorSlot slot, EditNode? node) =>
+    private void Add(BlockKind kind, int column, int row, EditorSlot? slot, EditNode? node) =>
         _blocks.Add(new LayoutBlock(kind, column, row, slot, node));
 
     private static BlockKind Kind(Command command) => command switch
